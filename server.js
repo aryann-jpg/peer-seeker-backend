@@ -37,8 +37,8 @@ mongoose
 const __dirname = path.resolve();
 app.use(express.static(path.join(__dirname, "../Frontend/dist"))); // For Vite, build goes to 'dist'
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../Frontend/dist/index.html"));
+app.get('/', (req, res) => {
+  res.send('API running');
 });
 
 // Start server
