@@ -20,7 +20,6 @@ router.post("/register", async (req, res) => {
       bio,
     } = req.body;
 
-    /* ===== BASIC VALIDATION ===== */
     if (!name || !email || !password || !role) {
       return res.status(400).json({
         message: "Name, email, password, and role are required",
@@ -33,7 +32,6 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    /* ===== CHECK EXISTING USER ===== */
     const exists = await Student.findOne({ email });
     if (exists) {
       return res.status(400).json({
@@ -41,10 +39,8 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    /* ===== HASH PASSWORD ===== */
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    /* ===== ROLE-BASED DATA ===== */
     const userData = {
       name,
       email,
@@ -53,19 +49,10 @@ router.post("/register", async (req, res) => {
       course,
       year,
       bio,
+      skills: role === "tutor" ? skills : [],
+      helpNeeded: role === "student" ? helpNeeded : [],
     };
 
-    if (role === "tutor") {
-      userData.skills = Array.isArray(skills) ? skills : [];
-      userData.helpNeeded = [];
-    }
-
-    if (role === "student") {
-      userData.helpNeeded = Array.isArray(helpNeeded) ? helpNeeded : [];
-      userData.skills = [];
-    }
-
-    /* ===== CREATE USER ===== */
     const student = await Student.create(userData);
 
     res.status(201).json({
@@ -75,8 +62,8 @@ router.post("/register", async (req, res) => {
         name: student.name,
         email: student.email,
         role: student.role,
-        helpNeeded: student.helpNeeded,
         skills: student.skills,
+        helpNeeded: student.helpNeeded,
       },
     });
   } catch (err) {
@@ -118,7 +105,7 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    /* ✅ IMPORTANT: SEND ROLE DATA */
+    // ✅ IMPORTANT: send skills + helpNeeded
     res.json({
       token,
       student: {
@@ -126,8 +113,8 @@ router.post("/login", async (req, res) => {
         name: student.name,
         email: student.email,
         role: student.role,
-        helpNeeded: student.helpNeeded,
         skills: student.skills,
+        helpNeeded: student.helpNeeded,
       },
     });
   } catch (err) {
