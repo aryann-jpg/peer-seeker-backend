@@ -5,12 +5,12 @@ import authMiddleware from "../middleware/token.js";
 const router = express.Router();
 
 /* =====================================================
-   GET ALL STUDENTS (Filtered by Role)
-   Used by Tutors to see available students
+   GET ALL STUDENTS 
+   Filtered to show only users with 'student' role
 ===================================================== */
 router.get("/", authMiddleware, async (req, res) => {
   try {
-    // Only return users who are actually students
+    // We filter by role so tutors only see students
     const students = await Student.find({ role: "student" });
     res.status(200).json(students);
   } catch (error) {
@@ -25,9 +25,7 @@ router.get("/", authMiddleware, async (req, res) => {
 router.get("/:id", authMiddleware, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
-    if (!student) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!student) return res.status(404).json({ message: "User not found" });
     res.json(student);
   } catch (error) {
     res.status(404).json({ message: "User not found" });
