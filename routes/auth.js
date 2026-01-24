@@ -75,6 +75,8 @@ router.post("/register", async (req, res) => {
         name: student.name,
         email: student.email,
         role: student.role,
+        helpNeeded: student.helpNeeded,
+        skills: student.skills,
       },
     });
   } catch (err) {
@@ -116,6 +118,7 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
+    /* ✅ IMPORTANT: SEND ROLE DATA */
     res.json({
       token,
       student: {
@@ -123,6 +126,8 @@ router.post("/login", async (req, res) => {
         name: student.name,
         email: student.email,
         role: student.role,
+        helpNeeded: student.helpNeeded,
+        skills: student.skills,
       },
     });
   } catch (err) {
