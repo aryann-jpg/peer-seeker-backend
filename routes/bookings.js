@@ -12,9 +12,11 @@ router.post("/", authMiddleware, async (req, res) => {
   try {
     const { tutorId, date, duration, message } = req.body;
 
-    const student = await Student.findById(req.user.id);
+    const student = await Student.findById(req.user.id); // <-- FIXED: use id
     if (!student || student.role !== "student") {
-      return res.status(403).json({ message: "Only students can book sessions" });
+      return res
+        .status(403)
+        .json({ message: "Only students can book sessions" });
     }
 
     const tutor = await Student.findById(tutorId);
@@ -34,7 +36,9 @@ router.post("/", authMiddleware, async (req, res) => {
     });
 
     if (conflict) {
-      return res.status(409).json({ message: "Tutor already booked at this time" });
+      return res
+        .status(409)
+        .json({ message: "Tutor already booked at this time" });
     }
 
     const booking = await Booking.create({
@@ -48,7 +52,7 @@ router.post("/", authMiddleware, async (req, res) => {
 
     res.status(201).json(booking);
   } catch (err) {
-    console.error("CREATE BOOKING ERROR:", err);
+    console.error(err);
     res.status(500).json({ message: "Failed to create booking" });
   }
 });
@@ -57,32 +61,22 @@ router.post("/", authMiddleware, async (req, res) => {
    GET STUDENT BOOKINGS
 ===================================================== */
 router.get("/my", authMiddleware, async (req, res) => {
-  try {
-    const bookings = await Booking.find({ student: req.user.id })
-      .populate("tutor", "name course year")
-      .sort({ date: 1 });
+  const bookings = await Booking.find({ student: req.user.id }) // <-- FIXED
+    .populate("tutor", "name course year")
+    .sort({ date: 1 });
 
-    res.json(bookings);
-  } catch (err) {
-    console.error("GET STUDENT BOOKINGS ERROR:", err);
-    res.status(500).json({ message: "Failed to load bookings" });
-  }
+  res.json(bookings);
 });
 
 /* =====================================================
    GET TUTOR BOOKINGS
 ===================================================== */
 router.get("/tutor", authMiddleware, async (req, res) => {
-  try {
-    const bookings = await Booking.find({ tutor: req.user.id })
-      .populate("student", "name course year helpNeeded")
-      .sort({ date: 1 });
+  const bookings = await Booking.find({ tutor: req.user.id }) // <-- FIXED
+    .populate("student", "name course year helpNeeded")
+    .sort({ date: 1 });
 
-    res.json(bookings);
-  } catch (err) {
-    console.error("GET TUTOR BOOKINGS ERROR:", err);
-    res.status(500).json({ message: "Failed to load bookings" });
-  }
+  res.json(bookings);
 });
 
 /* =====================================================
@@ -92,7 +86,7 @@ router.patch("/:id/status", authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
 
-    if (!["confirmed", "cancelled"].includes(status)) {
+    if (!["pending", "confirmed", "cancelled"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
@@ -101,7 +95,6 @@ router.patch("/:id/status", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // ✅ Check tutor ID
     if (booking.tutor.toString() !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
@@ -113,6 +106,28 @@ router.patch("/:id/status", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("UPDATE STATUS ERROR:", err);
     res.status(500).json({ message: "Failed to update booking status" });
+  }
+});
+
+/* =====================================================
+   DELETE BOOKING (STUDENT CANCEL)
+===================================================== */
+router.delete("/:id", authMiddleware, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    if (booking.student.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    booking.status = "cancelled"; // soft delete
+    await booking.save();
+
+    res.json({ message: "Booking cancelled" });
+  } catch (err) {
+    console.error("DELETE BOOKING ERROR:", err);
+    res.status(500).json({ message: "Failed to cancel booking" });
   }
 });
 
