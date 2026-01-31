@@ -6,13 +6,12 @@ import authMiddleware from "../middleware/token.js";
 const router = express.Router();
 
 /* =====================================================
-   CREATE BOOKING (STUDENT ONLY)
+   CREATE BOOKING (STUDENT)
 ===================================================== */
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const { tutorId, date, duration, message } = req.body;
 
-    // ✅ FIX: use req.user.id
     const student = await Student.findById(req.user.id);
     if (!student || student.role !== "student") {
       return res.status(403).json({ message: "Only students can book sessions" });
@@ -66,7 +65,7 @@ router.get("/my", authMiddleware, async (req, res) => {
     res.json(bookings);
   } catch (err) {
     console.error("GET STUDENT BOOKINGS ERROR:", err);
-    res.status(500).json({ message: "Failed to fetch bookings" });
+    res.status(500).json({ message: "Failed to load bookings" });
   }
 });
 
@@ -82,7 +81,7 @@ router.get("/tutor", authMiddleware, async (req, res) => {
     res.json(bookings);
   } catch (err) {
     console.error("GET TUTOR BOOKINGS ERROR:", err);
-    res.status(500).json({ message: "Failed to fetch bookings" });
+    res.status(500).json({ message: "Failed to load bookings" });
   }
 });
 
@@ -102,7 +101,7 @@ router.patch("/:id/status", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // ✅ FIX: req.user.id (NOT _id)
+    // ✅ Check tutor ID
     if (booking.tutor.toString() !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
@@ -110,7 +109,7 @@ router.patch("/:id/status", authMiddleware, async (req, res) => {
     booking.status = status;
     await booking.save();
 
-    res.json(booking);
+    res.json({ booking });
   } catch (err) {
     console.error("UPDATE STATUS ERROR:", err);
     res.status(500).json({ message: "Failed to update booking status" });
