@@ -126,5 +126,41 @@ router.delete("/:id", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Failed to cancel booking" });
   }
 });
+/* =====================================================
+   UPDATE BOOKING (STUDENT)
+===================================================== */
+router.put("/:id", authMiddleware, async (req, res) => {
+  try {
+    const { date, duration, message } = req.body;
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    // Only the student who created it can edit
+    if (booking.student.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Only pending bookings can be edited
+    if (booking.status !== "pending") {
+      return res.status(400).json({ message: "Only pending bookings can be updated" });
+    }
+
+    // Update fields
+    if (date) booking.date = new Date(date);
+    if (duration) booking.duration = duration;
+    if (message !== undefined) booking.message = message;
+
+    await booking.save();
+
+    // Populate tutor info for frontend
+    await booking.populate("tutor", "name course year");
+
+    res.json(booking);
+  } catch (err) {
+    console.error("UPDATE BOOKING ERROR:", err);
+    res.status(500).json({ message: "Failed to update booking" });
+  }
+});
 
 export default router;
