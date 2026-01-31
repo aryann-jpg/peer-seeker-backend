@@ -5,56 +5,69 @@ import authMiddleware from "../middleware/token.js";
 const router = express.Router();
 
 /* =====================================================
-   BOOKMARK / UNBOOKMARK TUTOR
+   BOOKMARK / UNBOOKMARK USER
+   - student → tutor
+   - tutor → student
 ===================================================== */
-router.post("/:tutorId", authMiddleware, async (req, res) => {
+router.post("/:targetId", authMiddleware, async (req, res) => {
   try {
-    const student = await Student.findById(req.user.id);
-    const tutorId = req.params.tutorId;
+    const user = await Student.findById(req.user.id);
+    const targetId = req.params.targetId;
 
-    if (!student || student.role !== "student") {
-      return res.status(403).json({ message: "Only students can bookmark tutors" });
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const tutor = await Student.findById(tutorId);
-    if (!tutor || tutor.role !== "tutor") {
-      return res.status(404).json({ message: "Tutor not found" });
+    const target = await Student.findById(targetId);
+    if (!target) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    if (!student.bookmarks) student.bookmarks = [];
+    // Only allow student <-> tutor bookmarking
+    if (
+      (user.role === "student" && target.role !== "tutor") ||
+      (user.role === "tutor" && target.role !== "student")
+    ) {
+      return res.status(403).json({ message: "Invalid bookmark target" });
+    }
 
-    const index = student.bookmarks.findIndex((id) => id.toString() === tutorId);
+    if (!user.bookmarks) user.bookmarks = [];
 
+    const index = user.bookmarks.findIndex(
+      (id) => id.toString() === targetId
+    );
+
+    // TOGGLE
     if (index >= 0) {
-      student.bookmarks.splice(index, 1);
-      await student.save();
+      user.bookmarks.splice(index, 1);
+      await user.save();
       return res.json({ message: "Bookmark removed" });
     } else {
-      student.bookmarks.push(tutorId);
-      await student.save();
-      return res.json({ message: "Tutor bookmarked" });
+      user.bookmarks.push(targetId);
+      await user.save();
+      return res.json({ message: "Bookmarked successfully" });
     }
   } catch (err) {
-    console.error("Bookmark error:", err);
+    console.error("BOOKMARK ERROR:", err);
     res.status(500).json({ message: "Bookmark failed" });
   }
 });
 
 /* =====================================================
-   GET ALL BOOKMARKED TUTORS
+   GET ALL BOOKMARKS FOR LOGGED-IN USER
 ===================================================== */
 router.get("/", authMiddleware, async (req, res) => {
   try {
-    const student = await Student.findById(req.user.id)
-      .populate("bookmarks", "-password"); // remove password field
+    const user = await Student.findById(req.user.id)
+      .populate("bookmarks", "-password");
 
-    if (!student || student.role !== "student") {
-      return res.status(403).json({ message: "Access denied" });
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
-    res.json(student.bookmarks || []);
+    res.json(user.bookmarks || []);
   } catch (err) {
-    console.error("Fetch bookmarks error:", err);
+    console.error("FETCH BOOKMARKS ERROR:", err);
     res.status(500).json({ message: "Failed to fetch bookmarks" });
   }
 });
