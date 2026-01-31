@@ -17,7 +17,7 @@ const bookingSchema = new mongoose.Schema(
       required: true,
     },
     duration: {
-      type: Number, // minutes
+      type: Number,
       required: true,
       min: 30,
       max: 180,

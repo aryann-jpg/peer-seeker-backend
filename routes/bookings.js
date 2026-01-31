@@ -12,11 +12,9 @@ router.post("/", authMiddleware, async (req, res) => {
   try {
     const { tutorId, date, duration, message } = req.body;
 
-    const student = await Student.findById(req.user.id); // <-- FIXED: use id
+    const student = await Student.findById(req.user.id);
     if (!student || student.role !== "student") {
-      return res
-        .status(403)
-        .json({ message: "Only students can book sessions" });
+      return res.status(403).json({ message: "Only students can book sessions" });
     }
 
     const tutor = await Student.findById(tutorId);
@@ -36,9 +34,7 @@ router.post("/", authMiddleware, async (req, res) => {
     });
 
     if (conflict) {
-      return res
-        .status(409)
-        .json({ message: "Tutor already booked at this time" });
+      return res.status(409).json({ message: "Tutor already booked at this time" });
     }
 
     const booking = await Booking.create({
@@ -61,10 +57,9 @@ router.post("/", authMiddleware, async (req, res) => {
    GET STUDENT BOOKINGS
 ===================================================== */
 router.get("/my", authMiddleware, async (req, res) => {
-  const bookings = await Booking.find({ student: req.user.id }) // <-- FIXED
+  const bookings = await Booking.find({ student: req.user.id })
     .populate("tutor", "name course year")
     .sort({ date: 1 });
-
   res.json(bookings);
 });
 
@@ -72,10 +67,9 @@ router.get("/my", authMiddleware, async (req, res) => {
    GET TUTOR BOOKINGS
 ===================================================== */
 router.get("/tutor", authMiddleware, async (req, res) => {
-  const bookings = await Booking.find({ tutor: req.user.id }) // <-- FIXED
+  const bookings = await Booking.find({ tutor: req.user.id })
     .populate("student", "name course year helpNeeded")
     .sort({ date: 1 });
-
   res.json(bookings);
 });
 
@@ -84,16 +78,18 @@ router.get("/tutor", authMiddleware, async (req, res) => {
 ===================================================== */
 router.patch("/:id/status", authMiddleware, async (req, res) => {
   try {
-    const { status } = req.body;
+    let { status } = req.body;
+
+    // Map frontend status to backend enum
+    const statusMap = { accepted: "confirmed", rejected: "cancelled" };
+    status = statusMap[status] || status;
 
     if (!["pending", "confirmed", "cancelled"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
     const booking = await Booking.findById(req.params.id);
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
 
     if (booking.tutor.toString() !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
@@ -121,7 +117,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    booking.status = "cancelled"; // soft delete
+    booking.status = "cancelled";
     await booking.save();
 
     res.json({ message: "Booking cancelled" });
