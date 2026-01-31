@@ -6,13 +6,14 @@ import authMiddleware from "../middleware/token.js";
 const router = express.Router();
 
 /* =====================================================
-   CREATE BOOKING (STUDENT)
+   CREATE BOOKING (STUDENT ONLY)
 ===================================================== */
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const { tutorId, date, duration, message } = req.body;
 
-    const student = await Student.findById(req.user._id);
+    // ✅ FIX: use req.user.id
+    const student = await Student.findById(req.user.id);
     if (!student || student.role !== "student") {
       return res.status(403).json({ message: "Only students can book sessions" });
     }
@@ -48,7 +49,7 @@ router.post("/", authMiddleware, async (req, res) => {
 
     res.status(201).json(booking);
   } catch (err) {
-    console.error(err);
+    console.error("CREATE BOOKING ERROR:", err);
     res.status(500).json({ message: "Failed to create booking" });
   }
 });
@@ -57,22 +58,32 @@ router.post("/", authMiddleware, async (req, res) => {
    GET STUDENT BOOKINGS
 ===================================================== */
 router.get("/my", authMiddleware, async (req, res) => {
-  const bookings = await Booking.find({ student: req.user._id })
-    .populate("tutor", "name course year")
-    .sort({ date: 1 });
+  try {
+    const bookings = await Booking.find({ student: req.user.id })
+      .populate("tutor", "name course year")
+      .sort({ date: 1 });
 
-  res.json(bookings);
+    res.json(bookings);
+  } catch (err) {
+    console.error("GET STUDENT BOOKINGS ERROR:", err);
+    res.status(500).json({ message: "Failed to fetch bookings" });
+  }
 });
 
 /* =====================================================
    GET TUTOR BOOKINGS
 ===================================================== */
 router.get("/tutor", authMiddleware, async (req, res) => {
-  const bookings = await Booking.find({ tutor: req.user._id })
-    .populate("student", "name course year helpNeeded")
-    .sort({ date: 1 });
+  try {
+    const bookings = await Booking.find({ tutor: req.user.id })
+      .populate("student", "name course year helpNeeded")
+      .sort({ date: 1 });
 
-  res.json(bookings);
+    res.json(bookings);
+  } catch (err) {
+    console.error("GET TUTOR BOOKINGS ERROR:", err);
+    res.status(500).json({ message: "Failed to fetch bookings" });
+  }
 });
 
 /* =====================================================
@@ -91,15 +102,15 @@ router.patch("/:id/status", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // 🔑 FIXED LINE
-    if (booking.tutor.toString() !== req.user._id.toString()) {
+    // ✅ FIX: req.user.id (NOT _id)
+    if (booking.tutor.toString() !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
     booking.status = status;
     await booking.save();
 
-    res.json({ booking });
+    res.json(booking);
   } catch (err) {
     console.error("UPDATE STATUS ERROR:", err);
     res.status(500).json({ message: "Failed to update booking status" });
