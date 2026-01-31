@@ -12,27 +12,19 @@ router.post("/", authMiddleware, async (req, res) => {
   try {
     const { tutorId, date, duration, message } = req.body;
 
-    const student = await Student.findById(req.user.id);
+    const student = await Student.findById(req.user._id);
     if (!student || student.role !== "student") {
       return res.status(403).json({ message: "Only students can book sessions" });
-    }
-
-    if (!tutorId || !date || !duration) {
-      return res.status(400).json({ message: "Tutor, date, and duration are required" });
-    }
-
-    if (duration < 30 || duration > 180) {
-      return res.status(400).json({ message: "Duration must be between 30 and 180 minutes" });
-    }
-
-    const bookingDate = new Date(date);
-    if (isNaN(bookingDate) || bookingDate <= new Date()) {
-      return res.status(400).json({ message: "Booking date must be in the future" });
     }
 
     const tutor = await Student.findById(tutorId);
     if (!tutor || tutor.role !== "tutor") {
       return res.status(404).json({ message: "Tutor not found" });
+    }
+
+    const bookingDate = new Date(date);
+    if (bookingDate <= new Date()) {
+      return res.status(400).json({ message: "Date must be in the future" });
     }
 
     const conflict = await Booking.findOne({
@@ -42,7 +34,7 @@ router.post("/", authMiddleware, async (req, res) => {
     });
 
     if (conflict) {
-      return res.status(409).json({ message: "Tutor already has a booking at this time" });
+      return res.status(409).json({ message: "Tutor already booked at this time" });
     }
 
     const booking = await Booking.create({
@@ -54,9 +46,9 @@ router.post("/", authMiddleware, async (req, res) => {
       status: "pending",
     });
 
-    res.status(201).json({ message: "Booking request sent", booking });
+    res.status(201).json(booking);
   } catch (err) {
-    console.error("CREATE BOOKING ERROR:", err);
+    console.error(err);
     res.status(500).json({ message: "Failed to create booking" });
   }
 });
@@ -65,12 +57,7 @@ router.post("/", authMiddleware, async (req, res) => {
    GET STUDENT BOOKINGS
 ===================================================== */
 router.get("/my", authMiddleware, async (req, res) => {
-  const user = await Student.findById(req.user.id);
-  if (!user || user.role !== "student") {
-    return res.status(403).json({ message: "Access denied" });
-  }
-
-  const bookings = await Booking.find({ student: user._id })
+  const bookings = await Booking.find({ student: req.user._id })
     .populate("tutor", "name course year")
     .sort({ date: 1 });
 
@@ -81,12 +68,7 @@ router.get("/my", authMiddleware, async (req, res) => {
    GET TUTOR BOOKINGS
 ===================================================== */
 router.get("/tutor", authMiddleware, async (req, res) => {
-  const tutor = await Student.findById(req.user.id);
-  if (!tutor || tutor.role !== "tutor") {
-    return res.status(403).json({ message: "Access denied" });
-  }
-
-  const bookings = await Booking.find({ tutor: tutor._id })
+  const bookings = await Booking.find({ tutor: req.user._id })
     .populate("student", "name course year helpNeeded")
     .sort({ date: 1 });
 
@@ -97,67 +79,31 @@ router.get("/tutor", authMiddleware, async (req, res) => {
    TUTOR ACCEPT / REJECT BOOKING
 ===================================================== */
 router.patch("/:id/status", authMiddleware, async (req, res) => {
-  const { status } = req.body;
+  try {
+    const { status } = req.body;
 
-  if (!["confirmed", "cancelled"].includes(status)) {
-    return res.status(400).json({ message: "Invalid status" });
+    if (!["confirmed", "cancelled"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // 🔑 FIXED LINE
+    if (booking.tutor.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    booking.status = status;
+    await booking.save();
+
+    res.json({ booking });
+  } catch (err) {
+    console.error("UPDATE STATUS ERROR:", err);
+    res.status(500).json({ message: "Failed to update booking status" });
   }
-
-  const booking = await Booking.findById(req.params.id);
-  if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-  if (booking.tutor.toString() !== req.user.id) {
-    return res.status(403).json({ message: "Unauthorized" });
-  }
-
-  booking.status = status;
-  await booking.save();
-
-  res.json({ message: `Booking ${status}`, booking });
-});
-
-/* =====================================================
-   STUDENT UPDATE (ONLY IF PENDING)
-===================================================== */
-router.put("/:id", authMiddleware, async (req, res) => {
-  const booking = await Booking.findById(req.params.id);
-  if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-  if (booking.student.toString() !== req.user.id) {
-    return res.status(403).json({ message: "Unauthorized" });
-  }
-
-  if (booking.status !== "pending") {
-    return res.status(400).json({ message: "Cannot edit confirmed booking" });
-  }
-
-  const { date, duration, message } = req.body;
-
-  if (date) booking.date = new Date(date);
-  if (duration) booking.duration = duration;
-  if (message !== undefined) booking.message = message;
-
-  await booking.save();
-
-  const updated = await Booking.findById(booking._id).populate("tutor", "name course");
-  res.json(updated);
-});
-
-/* =====================================================
-   DELETE BOOKING (STUDENT)
-===================================================== */
-router.delete("/:id", authMiddleware, async (req, res) => {
-  const booking = await Booking.findById(req.params.id);
-  if (!booking) return res.status(404).json({ message: "Booking not found" });
-
-  if (booking.student.toString() !== req.user.id) {
-    return res.status(403).json({ message: "Unauthorized" });
-  }
-
-  booking.status = "cancelled";
-  await booking.save();
-
-  res.json({ message: "Booking cancelled" });
 });
 
 export default router;
